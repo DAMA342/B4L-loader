@@ -13,25 +13,40 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # فك ضغط ملف B4L-Loader.rar باستخدام PowerShell
-    - name: Extract archive
+    # 1. فك ضغط ملف B4L-Loader.rar باستخدام 7z
+    - name: Extract RAR archive
+      shell: cmd
+      run: 7z x B4L-Loader.rar -o. -y
+
+    # 2. البحث عن ملف imgui.sln ونقل المكونات للمسار الرئيسي إن وجد داخل مجلد فرعي
+    - name: Move Solution to Root
       shell: powershell
       run: |
-        Expand-Archive -Path "B4L-Loader.rar" -DestinationPath . -Force -ErrorAction SilentlyContinue || powershell -command "Expand-Archive -Path *.zip -DestinationPath . -Force"
+        $sln = Get-ChildItem -Recurse -Filter "imgui.sln" | Select-Object -First 1
+        if ($sln) {
+            $dir = $sln.DirectoryName
+            if ($dir -ne (Get-Location).Path) {
+                Move-Item -Path "$dir\*" -Destination . -Force
+            }
+        }
 
+    # 3. إعداد MSBuild
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
+    # 4. استرجاع حزم NuGet
     - name: Restore NuGet packages
       run: nuget restore imgui.sln
 
+    # 5. تجميع المشروع
     - name: Build solution (Release x64)
       run: msbuild imgui.sln /p:Configuration=Release /p:Platform=x64
 
+    # 6. رفع الناتج النهائي
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: Compiled-Output
         path: |
-          **/Release/*.exe
-          **/Release/*.dll
+          **/*.exe
+          **/*.dll
