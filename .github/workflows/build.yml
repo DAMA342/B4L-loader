@@ -1,0 +1,37 @@
+name: Build Visual Studio Solution
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # فك ضغط ملف B4L-Loader.rar باستخدام PowerShell
+    - name: Extract archive
+      shell: powershell
+      run: |
+        Expand-Archive -Path "B4L-Loader.rar" -DestinationPath . -Force -ErrorAction SilentlyContinue || powershell -command "Expand-Archive -Path *.zip -DestinationPath . -Force"
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Restore NuGet packages
+      run: nuget restore imgui.sln
+
+    - name: Build solution (Release x64)
+      run: msbuild imgui.sln /p:Configuration=Release /p:Platform=x64
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Compiled-Output
+        path: |
+          **/Release/*.exe
+          **/Release/*.dll
